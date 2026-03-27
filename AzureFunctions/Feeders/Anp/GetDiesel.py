@@ -2,7 +2,6 @@ import logging
 import requests
 import pandas as pd
 from io import StringIO
-from io import BytesIO
 from datetime import datetime
 from bs4 import BeautifulSoup
 
@@ -11,7 +10,7 @@ ANP_PAGE_URL = (
     "serie-historica-de-precos-de-combustiveis"
 )
 
-DIESEL_CSV_KEYWORDS = ["diesel", "ca-", "combustiveis-automotivos", "combustivel"]
+DIESEL_CSV_KEYWORDS = ["diesel", "ca-", "combustiveis-automotivos"]
 
 
 def _find_diesel_csv_url(page_url):
@@ -27,27 +26,16 @@ def _find_diesel_csv_url(page_url):
         if not href.endswith(".csv"):
             continue
         href_lower = href.lower()
-        for keyword in DIESEL_CSV_KEYWORDS:
-            if keyword in href_lower:
-                csv_links.append(href)
-                break
+        if any(kw in href_lower for kw in DIESEL_CSV_KEYWORDS):
+            csv_links.append(href)
 
     if not csv_links:
-        raise Exception(f"No diesel CSV found on ANP page. Available CSVs: {[a['href'] for a in soup.find_all('a', href=True) if a['href'].endswith('.csv')][:10]}")
+        all_csvs = [a["href"] for a in soup.find_all("a", href=True) if a["href"].endswith(".csv")]
+        logging.warning(f"No diesel-specific CSV found. All CSVs: {all_csvs[:10]}")
+        raise Exception("No diesel CSV found on ANP page")
 
     csv_links.sort(reverse=True)
     return csv_links[0]
-
-
-def _try_parse_csv(content, encoding="utf-8"):
-    for sep in [";", ",", "\t"]:
-        try:
-            df = pd.read_csv(StringIO(content), sep=sep, decimal=",", encoding=encoding)
-            if len(df.columns) > 3:
-                return df
-        except Exception:
-            continue
-    raise Exception("Failed to parse ANP CSV with any separator")
 
 
 def get_diesel(date_ref):
@@ -65,28 +53,41 @@ def get_diesel(date_ref):
     except UnicodeDecodeError:
         text = response.content.decode("latin-1")
 
-    df = _try_parse_csv(text)
-    logging.info(f"ANP CSV columns: {list(df.columns)}")
+    df = pd.read_csv(StringIO(text), sep=";", decimal=",")
+    logging.info(f"ANP CSV columns: {list(df.columns)}, rows: {len(df)}")
 
     col_produto = next((c for c in df.columns if "produto" in c.lower()), None)
-    col_preco = next((c for c in df.columns if "revenda" in c.lower() and ("edio" in c.lower() or "media" in c.lower())), None)
     col_data = next((c for c in df.columns if "data" in c.lower()), None)
+    col_preco = next((c for c in df.columns if "valor de venda" in c.lower()), None)
+    if not col_preco:
+        col_preco = next((c for c in df.columns if "valor" in c.lower() and "compra" not in c.lower()), None)
 
     if not all([col_produto, col_preco, col_data]):
-        logging.error(f"Missing expected columns. Found: {list(df.columns)}")
+        logging.error(f"Missing columns. Need produto/data/preco. Found: {list(df.columns)}")
         return None
 
+    logging.info(f"Using columns: produto={col_produto}, data={col_data}, preco={col_preco}")
+
     diesel = df[df[col_produto].str.contains("DIESEL", case=False, na=False)].copy()
+    if diesel.empty:
+        logging.warning(f"No DIESEL rows found. Products: {df[col_produto].unique()[:10]}")
+        return None
+
     diesel[col_data] = pd.to_datetime(diesel[col_data], dayfirst=True, errors="coerce")
     diesel = diesel.dropna(subset=[col_data])
     diesel = diesel[diesel[col_data].dt.strftime("%Y-%m") == periodo]
 
     if diesel.empty:
-        available_periods = df[col_data].dropna().unique()[:5]
-        logging.warning(f"No ANP diesel data for {periodo}. Sample periods in CSV: {available_periods}")
+        logging.warning(f"No ANP diesel data for {periodo}")
         return None
 
-    preco_medio = pd.to_numeric(diesel[col_preco], errors="coerce").dropna().mean()
+    preco_medio = pd.to_numeric(
+        diesel[col_preco].astype(str).str.replace(",", "."), errors="coerce"
+    ).dropna().mean()
+
+    if pd.isna(preco_medio):
+        logging.warning(f"Could not compute mean price for {periodo}")
+        return None
 
     return {
         "periodo": periodo,

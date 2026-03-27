@@ -1,4 +1,5 @@
 import logging
+import time
 import requests
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -12,6 +13,7 @@ INDICADORES = {
 }
 
 MAX_MONTHS_BACK = 6
+MAX_RETRIES = 3
 
 
 def _build_url(config, periodo):
@@ -21,15 +23,25 @@ def _build_url(config, periodo):
     )
 
 
+def _fetch_with_retry(url):
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            logging.warning(f"IBGE request attempt {attempt}/{MAX_RETRIES} failed: {e}")
+            if attempt < MAX_RETRIES:
+                time.sleep(3 * attempt)
+    return None
+
+
 def _try_fetch(config, nome, dt):
     periodo = dt.strftime("%Y%m")
     url = _build_url(config, periodo)
     logging.info(f"Fetching {nome}: {url}")
 
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    data = response.json()
-
+    data = _fetch_with_retry(url)
     if not data or not isinstance(data, list) or len(data) == 0:
         return None
 

@@ -1,5 +1,6 @@
 import azure.functions as func
 import logging
+import re
 from datetime import datetime, timezone
 from Util.logging_config import configure_logging
 from Storage.TableStorageClient import TableStorageClient
@@ -16,6 +17,30 @@ INDICES_FGV = {
     IGP_DI: get_hist_igpdi,
 }
 
+MESES_PT = {
+    "jan": "01", "fev": "02", "mar": "03", "abr": "04",
+    "mai": "05", "jun": "06", "jul": "07", "ago": "08",
+    "set": "09", "out": "10", "nov": "11", "dez": "12",
+}
+
+
+def _parse_dt_ref(dt_ref):
+    dt_ref = str(dt_ref).strip().lower()
+    match = re.match(r"(\w{3})/(\d{4})", dt_ref)
+    if match:
+        mes_abrev, ano = match.groups()
+        mes_num = MESES_PT.get(mes_abrev)
+        if mes_num:
+            return f"{ano}-{mes_num}"
+    if re.match(r"\d{4}-\d{2}", dt_ref):
+        return dt_ref[:7]
+    match = re.match(r"(\d{2})/(\d{4})", dt_ref)
+    if match:
+        mes, ano = match.groups()
+        return f"{ano}-{mes}"
+    logging.warning(f"Could not parse dt_ref: {dt_ref}")
+    return None
+
 
 def execute(date_ref=None):
     storage = TableStorageClient()
@@ -25,14 +50,16 @@ def execute(date_ref=None):
         try:
             logging.info(f"Collecting {indice_name}")
             df = fetch_fn()
+            count = 0
             for _, row in df.iterrows():
-                dt_ref = str(row["dt_ref"]).strip()
                 valor = row[indice_name]
                 try:
                     float(valor)
                 except (ValueError, TypeError):
                     continue
-                periodo = dt_ref[:7] if len(dt_ref) >= 7 else dt_ref
+                periodo = _parse_dt_ref(row["dt_ref"])
+                if not periodo:
+                    continue
                 storage.upsert_indice(
                     partition_key=indice_name,
                     row_key=periodo,
@@ -41,7 +68,8 @@ def execute(date_ref=None):
                     fonte=FONTE_FGV,
                     unidade=UNIDADE_PERCENTUAL,
                 )
-            logging.info(f"{indice_name} collected successfully")
+                count += 1
+            logging.info(f"{indice_name}: {count} records upserted")
         except Exception as e:
             logging.error(f"Error collecting {indice_name}: {e}")
 

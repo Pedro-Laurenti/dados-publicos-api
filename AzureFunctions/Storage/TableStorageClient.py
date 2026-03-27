@@ -42,5 +42,5 @@ class TableStorageClient:
         return list(self._table.query_entities(query))
 
     def list_indices(self):
-        entities = self._table.query_entities("PartitionKey ne ''", select=["PartitionKey"])
+        entities = self._table.query_entities(select=["PartitionKey"])
         return list(set(e["PartitionKey"] for e in entities))
