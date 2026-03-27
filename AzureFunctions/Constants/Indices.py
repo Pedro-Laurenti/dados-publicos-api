@@ -1,0 +1,17 @@
+INCC_M = "incc-m"
+IGP_M = "igp-m"
+IGP_DI = "igp-di"
+IPCA = "ipca"
+INPC = "inpc"
+SINAPI = "sinapi"
+SELIC = "selic"
+ANP_DIESEL = "anp-diesel"
+
+FONTE_FGV = "FGV/IBRE"
+FONTE_IBGE = "IBGE"
+FONTE_BACEN = "BACEN"
+FONTE_ANP = "ANP"
+
+UNIDADE_PERCENTUAL = "%"
+UNIDADE_REAIS_LITRO = "R$/litro"
+UNIDADE_TAXA = "% a.a."
