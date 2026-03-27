@@ -79,6 +79,52 @@ Centralizadas em `config.py`. Padrão: `DADPUBAPI_[FUNCAO]_[NOME]`.
 | `DADPUBAPI_FGV_USER` | Usuário FGV/IBRE |
 | `DADPUBAPI_FGV_PASSWORD` | Senha FGV/IBRE |
 
+## Glossário dos índices
+
+> Seção educativa — o que é cada índice, quem o coleta e onde é usado na prática.
+
+### INCC-M — Índice Nacional de Custo da Construção (Mensal)
+**O que é:** Mede a variação dos custos de construção civil no Brasil. Composto por mão de obra e materiais de construção.  
+**Feeder:** `downloader_fgv` → `Feeders/Fgv/GetIncc.py`  
+**Aplicação real:** Reajuste de contratos de obras e incorporações imobiliárias (ex.: contratos de compra de imóvel na planta — o saldo devedor é corrigido mensalmente pelo INCC-M até a entrega das chaves).
+
+### IGP-M — Índice Geral de Preços do Mercado
+**O que é:** Média ponderada de três sub-índices: IPA-M (60% — preços no atacado), IPC-M (30% — preços ao consumidor) e INCC-M (10% — custo da construção).  
+**Feeder:** `downloader_fgv` → `Feeders/Fgv/GetIgpm.py`  
+**Aplicação real:** Reajuste de aluguéis residenciais e comerciais, tarifas de energia elétrica e contratos de longo prazo com cláusula de correção monetária.
+
+### IGP-DI — Índice Geral de Preços — Disponibilidade Interna
+**O que é:** Mesma metodologia do IGP-M, mas com coleta em período diferente (dia 1 ao dia 30 do mês, enquanto o IGP-M vai do dia 21 ao 20). Reflete melhor o preço "dentro" do mercado doméstico.  
+**Feeder:** `downloader_fgv` → `Feeders/Fgv/GetIgpdi.py`  
+**Aplicação real:** Correção de contratos de obras públicas de infraestrutura, debêntures e alguns financiamentos do BNDES.
+
+### IPCA — Índice Nacional de Preços ao Consumidor Amplo
+**O que é:** Inflação oficial do Brasil. Mede a variação de preços de uma cesta de bens e serviços consumidos por famílias com renda de 1 a 40 salários mínimos.  
+**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetIndicadores.py`  
+**Aplicação real:** Meta de inflação do Banco Central, correção do Tesouro IPCA+ (NTN-B), reajuste de planos de saúde e referência para contratos indexados à inflação.
+
+### INPC — Índice Nacional de Preços ao Consumidor
+**O que é:** Similar ao IPCA, mas focado em famílias de menor renda (1 a 5 salários mínimos). Tende a ser mais sensível a alimentos e transporte público.  
+**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetIndicadores.py`  
+**Aplicação real:** Reajuste do salário mínimo, benefícios previdenciários e dissídios coletivos de trabalhadores.
+
+### SINAPI — Sistema Nacional de Pesquisa de Custos e Índices da Construção Civil
+**O que é:** Pesquisa mensal do IBGE em parceria com a Caixa Econômica Federal que apura preços de insumos e custos de mão de obra na construção civil, por estado.  
+**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetIndicadores.py`  
+**Aplicação real:** Referência obrigatória para orçamentos e medições de obras financiadas com recursos públicos federais (PAC, Minha Casa Minha Vida, licitações da Lei 14.133/2021).
+
+### Selic — Taxa do Sistema Especial de Liquidação e Custódia
+**O que é:** Taxa básica de juros da economia brasileira, definida pelo COPOM (Banco Central) a cada 45 dias. Remunera títulos públicos federais.  
+**Feeder:** `downloader_bacen` → `Feeders/Bacen/GetSelic.py`  
+**Aplicação real:** Referência para toda a cadeia de crédito (CDI, juros bancários, financiamentos), correção de dívidas tributárias e rendimento de aplicações como Tesouro Selic.
+
+### ANP Diesel — Preço médio do Diesel (ANP)
+**O que é:** Levantamento semanal da Agência Nacional do Petróleo com o preço médio de revenda do diesel (ao consumidor) por estado e município.  
+**Feeder:** `downloader_anp` → `Feeders/Anp/GetDiesel.py`  
+**Aplicação real:** Reajuste de contratos de transporte de cargas e obras, cálculo de BDI (Benefícios e Despesas Indiretas) em orçamentos de engenharia e planilhas de composição de custos rodoviários.
+
+---
+
 ## Deploy
 
 ```bash
