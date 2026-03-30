@@ -3,8 +3,9 @@ import logging
 from datetime import datetime, timezone
 from Util.logging_config import configure_logging
 from Storage.TableStorageClient import TableStorageClient
-from Constants.Indices import IPCA, INPC, SINAPI, FONTE_IBGE, UNIDADE_PERCENTUAL
+from Constants.Indices import IPCA, INPC, SINAPI, PIB, FONTE_IBGE, UNIDADE_PERCENTUAL
 from Feeders.Ibge.GetIndicadores import get_indicador
+from Feeders.Ibge.GetPib import get_pib
 
 configure_logging()
 
@@ -37,6 +38,24 @@ def execute(date_ref=None):
             logging.info(f"{indice_name} collected successfully")
         except Exception as e:
             logging.error(f"Error collecting {indice_name}: {e}")
+
+    try:
+        logging.info(f"Collecting {PIB}")
+        result = get_pib(today)
+        if not result:
+            logging.warning(f"No data for {PIB}")
+        else:
+            storage.upsert_indice(
+                partition_key=PIB,
+                row_key=result["periodo"],
+                valor=result["valor"],
+                data_divulgacao=today,
+                fonte=FONTE_IBGE,
+                unidade=UNIDADE_PERCENTUAL,
+            )
+            logging.info(f"{PIB} collected successfully")
+    except Exception as e:
+        logging.error(f"Error collecting {PIB}: {e}")
 
 
 def main(mytimer: func.TimerRequest, context: func.Context) -> None:

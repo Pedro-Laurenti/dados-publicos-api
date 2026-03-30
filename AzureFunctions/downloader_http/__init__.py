@@ -11,6 +11,7 @@ DOWNLOADER_MAP = {
     "ibge": "downloader_ibge",
     "bacen": "downloader_bacen",
     "anp": "downloader_anp",
+    "b3": "downloader_b3",
 }
 
 
