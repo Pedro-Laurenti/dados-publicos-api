@@ -14,17 +14,17 @@ class TableStorageClient:
         )
         self._table = service.get_table_client(TABLE_NAME)
 
-    def upsert_indice(self, partition_key, row_key, valor, data_divulgacao, fonte, unidade):
+    def upsert_indice(self, partition_key, row_key, valor, periodo, fonte, unidade):
         entity = {
             "PartitionKey": partition_key,
             "RowKey": row_key,
             "valor": float(valor),
-            "data_divulgacao": data_divulgacao,
+            "periodo": periodo,
             "fonte": fonte,
             "unidade": unidade,
         }
         self._table.upsert_entity(entity)
-        logging.info(f"Upsert: {partition_key} | {row_key} | {valor}")
+        logging.info(f"Upsert: {partition_key} | {row_key} | periodo={periodo} | {valor}")
 
     def get_indice(self, partition_key, row_key):
         try:
@@ -41,6 +41,14 @@ class TableStorageClient:
         query = " and ".join(filters)
         return list(self._table.query_entities(query))
 
-    def list_indices(self):
-        entities = self._table.query_entities(select=["PartitionKey"])
-        return list(set(e["PartitionKey"] for e in entities))
+    def get_latest(self, partition_key):
+        """Retorna a entidade mais recente de um índice (último RowKey)."""
+        entities = self._table.query_entities(
+            f"PartitionKey eq '{partition_key}'",
+            results_per_page=1,
+        )
+        latest = None
+        for e in entities:
+            if latest is None or e["RowKey"] > latest["RowKey"]:
+                latest = e
+        return latest

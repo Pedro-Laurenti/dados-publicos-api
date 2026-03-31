@@ -41,13 +41,13 @@ def execute(date_ref=None):
                 continue
             storage.upsert_indice(
                 partition_key=indice_name,
-                row_key=result["periodo"],
+                row_key=today_str,
                 valor=result["valor"],
-                data_divulgacao=today_str,
+                periodo=result["periodo"],
                 fonte=FONTE_B3,
                 unidade=UNIDADE_PONTOS,
             )
-            logging.info(f"{indice_name}: upserted {result['periodo']} = {result['valor']}")
+            logging.info(f"{indice_name}: {today_str} = {result['valor']} (periodo={result['periodo']})")
         except Exception as e:
             logging.error(f"Error collecting {indice_name}: {e}")
 

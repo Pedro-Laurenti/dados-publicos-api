@@ -21,13 +21,13 @@ def execute(date_ref=None):
             return
         storage.upsert_indice(
             partition_key=SOFR,
-            row_key=result["periodo"],
+            row_key=today,
             valor=result["valor"],
-            data_divulgacao=today,
+            periodo=result["periodo"],
             fonte=FONTE_FEDNY,
             unidade=UNIDADE_TAXA,
         )
-        logging.info(f"{SOFR}: upserted {result['periodo']} = {result['valor']}")
+        logging.info(f"{SOFR}: {today} = {result['valor']} (periodo={result['periodo']})")
     except Exception as e:
         logging.error(f"Error collecting {SOFR}: {e}")
 

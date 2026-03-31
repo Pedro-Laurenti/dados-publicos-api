@@ -50,26 +50,31 @@ def execute(date_ref=None):
         try:
             logging.info(f"Collecting {indice_name}")
             df = fetch_fn()
-            count = 0
-            for _, row in df.iterrows():
-                valor = row[indice_name]
-                try:
-                    float(valor)
-                except (ValueError, TypeError):
-                    continue
-                periodo = _parse_dt_ref(row["dt_ref"])
-                if not periodo:
-                    continue
-                storage.upsert_indice(
-                    partition_key=indice_name,
-                    row_key=periodo,
-                    valor=valor,
-                    data_divulgacao=today,
-                    fonte=FONTE_FGV,
-                    unidade=UNIDADE_PERCENTUAL,
-                )
-                count += 1
-            logging.info(f"{indice_name}: {count} records upserted")
+            if df is None or df.empty:
+                logging.warning(f"No data for {indice_name}")
+                continue
+
+            last_row = df.iloc[-1]
+            valor = last_row[indice_name]
+            try:
+                valor = float(valor)
+            except (ValueError, TypeError):
+                logging.warning(f"{indice_name}: invalid last value {valor}")
+                continue
+
+            periodo = _parse_dt_ref(last_row["dt_ref"])
+            if not periodo:
+                continue
+
+            storage.upsert_indice(
+                partition_key=indice_name,
+                row_key=today,
+                valor=valor,
+                periodo=periodo,
+                fonte=FONTE_FGV,
+                unidade=UNIDADE_PERCENTUAL,
+            )
+            logging.info(f"{indice_name}: {today} = {valor} (periodo={periodo})")
         except Exception as e:
             logging.error(f"Error collecting {indice_name}: {e}")
 

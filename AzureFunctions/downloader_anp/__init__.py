@@ -21,13 +21,13 @@ def execute(date_ref=None):
             return
         storage.upsert_indice(
             partition_key=ANP_DIESEL,
-            row_key=result["periodo"],
+            row_key=today,
             valor=result["valor"],
-            data_divulgacao=today,
+            periodo=result["periodo"],
             fonte=FONTE_ANP,
             unidade=UNIDADE_REAIS_LITRO,
         )
-        logging.info("ANP Diesel collected successfully")
+        logging.info(f"ANP Diesel: {today} = {result['valor']} (periodo={result['periodo']})")
     except Exception as e:
         logging.error(f"Error collecting ANP Diesel: {e}")
 

@@ -10,17 +10,20 @@ Para descrição detalhada de cada índice, veja o [Glossário](GLOSSARIO.md).
 
 ## Consultar dados — `GET /api/indices`
 
-```
-/api/indices                                          → último valor de todos
-/api/indices?nome=ipca                                → último IPCA
-/api/indices?nome=cdi&data_inicio=2025-01&data_fim=2025-12  → histórico CDI
-```
+| Endpoint | Descrição |
+|---|---|
+| `/api/indices` | Último valor de todos os índices |
+| `/api/indices?nome=ipca` | Último dado do IPCA |
+| `/api/indices?nome=ipca&data=2026-03-30` | IPCA coletado em 30/03/2026 (404 se não existir) |
+| `/api/indices?nome=ipca&data_inicio=2026-01-01&data_fim=2026-03-31` | Histórico diário do IPCA no período |
+
 
 | Parâmetro | Obrigatório | Descrição |
 |---|---|---|
 | `nome` | Não | Identificador do índice (tabela abaixo) |
-| `data_inicio` | Não | Período inicial `YYYY-MM` |
-| `data_fim` | Não | Período final `YYYY-MM` |
+| `data` | Não | Data exata de coleta `YYYY-MM-DD` (retorna 404 se não coletado) |
+| `data_inicio` | Não | Data inicial `YYYY-MM-DD` |
+| `data_fim` | Não | Data final `YYYY-MM-DD` |
 
 ### Todos os índices disponíveis
 

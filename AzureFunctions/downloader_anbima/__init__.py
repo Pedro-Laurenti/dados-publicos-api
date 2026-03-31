@@ -23,13 +23,13 @@ def execute(date_ref=None):
             for item in ettj_results:
                 storage.upsert_indice(
                     partition_key=item["nome"],
-                    row_key=item["periodo"],
+                    row_key=today,
                     valor=item["valor"],
-                    data_divulgacao=today,
+                    periodo=item["periodo"],
                     fonte=FONTE_ANBIMA,
                     unidade=UNIDADE_TAXA,
                 )
-                logging.info(f"{item['nome']}: upserted {item['periodo']} = {item['valor']}")
+                logging.info(f"{item['nome']}: {today} = {item['valor']}")
         else:
             logging.warning("No ETTJ data available")
     except Exception as e:
@@ -41,13 +41,13 @@ def execute(date_ref=None):
         if result:
             storage.upsert_indice(
                 partition_key=NTNB_2035,
-                row_key=result["periodo"],
+                row_key=today,
                 valor=result["valor"],
-                data_divulgacao=today,
+                periodo=result["periodo"],
                 fonte=FONTE_ANBIMA,
                 unidade=UNIDADE_TAXA,
             )
-            logging.info(f"{NTNB_2035}: upserted {result['periodo']} = {result['valor']}")
+            logging.info(f"{NTNB_2035}: {today} = {result['valor']}")
         else:
             logging.warning(f"No data available for {NTNB_2035}")
     except Exception as e:
