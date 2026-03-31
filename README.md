@@ -1,208 +1,158 @@
 # dados-publicos-api
 
-Azure Function App Python para coleta e consulta de índices públicos para precificação de obras de engenharia civil e acompanhamento de mercado imobiliário.
+Azure Function App para coleta automatizada de índices econômicos públicos. Focada em precificação de obras, financiamento imobiliário e acompanhamento de mercado.
 
-## Infraestrutura Azure
+**34 índices** coletados de 7 fontes oficiais: BACEN, IBGE, FGV/IBRE, B3, ANBIMA, ANP e FedNY.
 
-| Recurso | Nome | Detalhes |
-|---|---|---|
-| Resource Group | `rg-dados-publicos-api` | Brazil South |
-| Storage Account | `stdadospublicosapi` | Standard_LRS |
-| Table Storage | `IndicesPublicos` | Armazenamento dos índices |
-| Function App | `func-dados-publicos-api` | Flex Consumption, Python 3.11 |
-| Application Insights | `func-dados-publicos-api` | Monitoramento |
-
-## Autenticação
-
-100% Managed Identity (System-Assigned) com RBAC. Nenhuma connection string de storage.
-
-| RBAC Role | Finalidade |
-|---|---|
-| Storage Blob Data Owner | Runtime Azure Functions + deployment |
-| Storage Queue Data Contributor | Runtime Azure Functions |
-| Storage Table Data Contributor | Aplicação (tabela IndicesPublicos) |
-
-## Índices coletados
-
-### Construção civil e inflação
-
-| Índice | Fonte | Periodicidade | Unidade | Trigger |
-|---|---|---|---|---|
-| INCC-M | FGV/IBRE | Mensal | % | `downloader_fgv` (diário 08h UTC) |
-| IGP-M | FGV/IBRE | Mensal | % | `downloader_fgv` (diário 08h UTC) |
-| IGP-DI | FGV/IBRE | Mensal | % | `downloader_fgv` (diário 08h UTC) |
-| IPCA | IBGE SIDRA | Mensal | % | `downloader_ibge` (diário 09h UTC) |
-| INPC | IBGE SIDRA | Mensal | % | `downloader_ibge` (diário 09h UTC) |
-| SINAPI | IBGE SIDRA | Mensal | % | `downloader_ibge` (diário 09h UTC) |
-| PIB Trimestral | IBGE SIDRA | Trimestral | % a.a. | `downloader_ibge` (diário 09h UTC) |
-| ANP Diesel | ANP | Semanal | R$/litro | `downloader_anp` (segunda 10h UTC) |
-
-### Taxas e câmbio (BACEN)
-
-| Índice | Fonte | Periodicidade | Unidade | Trigger |
-|---|---|---|---|---|
-| Selic | BACEN SGS 11 | Mensal acumulado | % a.a. | `downloader_bacen` (diário 18h UTC) |
-| CDI | BACEN SGS 4391 | Mensal acumulado | % a.m. | `downloader_bacen` (diário 18h UTC) |
-| PTAX USD | BACEN SGS 3696 | Mensal (fim período) | R$/USD | `downloader_bacen` (diário 18h UTC) |
-| Taxa Financ. Imob. PF | BACEN SGS 25497 | Mensal | % a.m. | `downloader_bacen` (diário 18h UTC) |
-
-### Mercado de capitais (B3)
-
-| Índice | Fonte | Periodicidade | Unidade | Trigger |
-|---|---|---|---|---|
-| IFIX | B3 | Mensal (último dia) | pts | `downloader_b3` (dias 28–31 às 22h UTC) |
-| IBOVESPA | B3 | Mensal (último dia) | pts | `downloader_b3` (dias 28–31 às 22h UTC) |
-| IMOB | B3 | Mensal (último dia) | pts | `downloader_b3` (dias 28–31 às 22h UTC) |
-
-### Não implementados (dependência de API privada ou fonte sem API pública)
-
-| Índice | Fonte | Motivo |
-|---|---|---|
-| NTN-B 2035 (taxa indicativa) | ANBIMA | API requer autenticação OAuth (`api.anbima.com.br`) |
-| SBPE — saldo poupança | BACEN SGS | Série SGS pública não identificada (IDs testados retornam séries regionais ou de crédito geral, não SBPE habitacional) |
-| SBPE — contratações valor | BACEN SGS | Mesma razão; série SBPE específica não encontrada na API pública |
-| SBPE — contratações unidades | BACEN SGS | Mesma razão |
-| Consumo de cimento | SNIC | Apenas via relatório PDF mensal (sem API pública) |
-| Consumo de aço longo | Instituto Aço Brasil | Apenas via relatório PDF mensal (sem API pública) |
-
-## Endpoints HTTP (públicos, sem autenticação)
-
-### GET `/api/indices`
-
-Consulta de índices armazenados.
-
-```
-https://func-dados-publicos-api.azurewebsites.net/api/indices
-https://func-dados-publicos-api.azurewebsites.net/api/indices?nome=ipca
-https://func-dados-publicos-api.azurewebsites.net/api/indices?nome=incc-m&data_inicio=2025-01&data_fim=2025-12
-```
-
-| Parâmetro | Obrigatório | Descrição |
-|---|---|---|
-| `nome` | Não | Nome do índice (ex: `incc-m`, `ipca`, `cdi`, `ifix`) |
-| `data_inicio` | Não | Período inicial `YYYY-MM` |
-| `data_fim` | Não | Período final `YYYY-MM` |
-
-Sem parâmetros retorna o último valor de cada índice. Com `nome` retorna o último valor daquele índice. Com `nome` + datas retorna o histórico no intervalo.
-
-### GET `/api/downloader_http`
-
-Disparo forçado de coleta por data.
-
-```
-https://func-dados-publicos-api.azurewebsites.net/api/downloader_http?downloader=bacen&date=2026-03-27
-https://func-dados-publicos-api.azurewebsites.net/api/downloader_http?downloader=b3&date=2026-03-31
-```
-
-| Parâmetro | Obrigatório | Descrição |
-|---|---|---|
-| `downloader` | Sim | Nome do downloader: `fgv`, `ibge`, `bacen`, `anp`, `b3` |
-| `date` | Sim | Data de referência `YYYY-MM-DD` |
-
-> **Atenção:** `downloader=b3` só coleta dados se `date` for o último dia do mês (guard automático).
-
-## Variáveis de ambiente
-
-Centralizadas em `config.py`. Padrão: `DADPUBAPI_[FUNCAO]_[NOME]`.
-
-| Variável | Descrição |
-|---|---|
-| `AzureWebJobsStorage__accountName` | Storage Account (identity-based, runtime) |
-| `DADPUBAPI_STORAGE_TABLE_URL` | URL do Table endpoint (identity-based, aplicação) |
-| `DADPUBAPI_FGV_USER` | Usuário FGV/IBRE |
-| `DADPUBAPI_FGV_PASSWORD` | Senha FGV/IBRE |
-
-## Glossário dos índices
-
-### INCC-M — Índice Nacional de Custo da Construção (Mensal)
-**O que é:** Mede a variação dos custos de construção civil no Brasil. Composto por mão de obra e materiais de construção.
-**Feeder:** `downloader_fgv` → `Feeders/Fgv/GetIncc.py`
-**Aplicação real:** Reajuste de contratos de obras e incorporações imobiliárias (ex.: contratos de compra de imóvel na planta — o saldo devedor é corrigido mensalmente pelo INCC-M até a entrega das chaves).
-
-### IGP-M — Índice Geral de Preços do Mercado
-**O que é:** Média ponderada de três sub-índices: IPA-M (60% — preços no atacado), IPC-M (30% — preços ao consumidor) e INCC-M (10% — custo da construção).
-**Feeder:** `downloader_fgv` → `Feeders/Fgv/GetIgpm.py`
-**Aplicação real:** Reajuste de aluguéis residenciais e comerciais, tarifas de energia elétrica e contratos de longo prazo com cláusula de correção monetária.
-
-### IGP-DI — Índice Geral de Preços — Disponibilidade Interna
-**O que é:** Mesma metodologia do IGP-M, mas com coleta em período diferente (dia 1 ao dia 30 do mês). Reflete melhor o preço "dentro" do mercado doméstico.
-**Feeder:** `downloader_fgv` → `Feeders/Fgv/GetIgpdi.py`
-**Aplicação real:** Correção de contratos de obras públicas de infraestrutura, debêntures e alguns financiamentos do BNDES.
-
-### IPCA — Índice Nacional de Preços ao Consumidor Amplo
-**O que é:** Inflação oficial do Brasil. Mede a variação de preços de uma cesta de bens e serviços consumidos por famílias com renda de 1 a 40 salários mínimos.
-**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetIndicadores.py`
-**Aplicação real:** Meta de inflação do Banco Central, correção do Tesouro IPCA+ (NTN-B), reajuste de planos de saúde.
-
-### INPC — Índice Nacional de Preços ao Consumidor
-**O que é:** Similar ao IPCA, mas focado em famílias de menor renda (1 a 5 salários mínimos).
-**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetIndicadores.py`
-**Aplicação real:** Reajuste do salário mínimo, benefícios previdenciários e dissídios coletivos.
-
-### SINAPI — Sistema Nacional de Pesquisa de Custos e Índices da Construção Civil
-**O que é:** Pesquisa mensal do IBGE/CEF com preços de insumos e mão de obra na construção civil, por estado.
-**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetIndicadores.py`
-**Aplicação real:** Referência obrigatória para orçamentos de obras financiadas com recursos públicos federais.
-
-### Selic — Taxa do Sistema Especial de Liquidação e Custódia
-**O que é:** Taxa básica de juros da economia brasileira, definida pelo COPOM a cada 45 dias.
-**Feeder:** `downloader_bacen` → `Feeders/Bacen/GetSelic.py`
-**Aplicação real:** Referência para toda a cadeia de crédito, correção de dívidas tributárias e rendimento do Tesouro Selic.
-
-### CDI — Certificado de Depósito Interbancário
-**O que é:** Taxa de juros das operações de crédito entre bancos. Praticamente igual à Selic, usada como benchmark do mercado financeiro.
-**Feeder:** `downloader_bacen` → `Feeders/Bacen/GetSeries.py` (SGS 4391)
-**Aplicação real:** Rentabilidade de CDBs, fundos de renda fixa, LCIs e debêntures atreladas ao CDI.
-
-### PTAX USD — Taxa de Câmbio Dólar (PTAX)
-**O que é:** Média das cotações do dólar americano apuradas pelo Banco Central no mercado interbancário ao longo do mês.
-**Feeder:** `downloader_bacen` → `Feeders/Bacen/GetSeries.py` (SGS 3696)
-**Aplicação real:** Contratos de câmbio, precificação de importações, correção de dívidas em moeda estrangeira.
-
-### Taxa de Financiamento Imobiliário PF
-**O que é:** Taxa média de juros dos financiamentos imobiliários concedidos a pessoas físicas pelo sistema financeiro nacional.
-**Feeder:** `downloader_bacen` → `Feeders/Bacen/GetSeries.py` (SGS 25497)
-**Aplicação real:** Referência para análise de viabilidade de empreendimentos imobiliários e custo de aquisição de imóveis.
-
-### PIB Trimestral — Produto Interno Bruto
-**O que é:** Taxa de variação do PIB a preços de mercado em relação ao mesmo período do ano anterior.
-**Feeder:** `downloader_ibge` → `Feeders/Ibge/GetPib.py`
-**Aplicação real:** Indicador macroeconômico de crescimento econômico; referência para análise de viabilidade de projetos e projeção de demanda imobiliária.
-**Observação:** RowKey usa o último mês do trimestre (Q1→03, Q2→06, Q3→09, Q4→12). IBGE publica com ~2 meses de defasagem.
-
-### ANP Diesel — Preço médio do Diesel
-**O que é:** Levantamento semanal da ANP com o preço médio de revenda do diesel ao consumidor.
-**Feeder:** `downloader_anp` → `Feeders/Anp/GetDiesel.py`
-**Aplicação real:** Reajuste de contratos de transporte, BDI em orçamentos de engenharia e composição de custos rodoviários.
-
-### IFIX — Índice de Fundos de Investimento Imobiliário
-**O que é:** Índice da B3 que mede a performance dos FIIs (Fundos de Investimento Imobiliário) negociados em bolsa.
-**Feeder:** `downloader_b3` → `Feeders/B3/GetIndices.py`
-**Aplicação real:** Benchmark para investidores em FIIs, análise de retorno do mercado imobiliário listado.
-
-### IBOVESPA — Índice Bovespa
-**O que é:** Principal índice do mercado de ações brasileiro, composto pelas ações mais negociadas na B3.
-**Feeder:** `downloader_b3` → `Feeders/B3/GetIndices.py`
-**Aplicação real:** Benchmark para renda variável, análise de custo de oportunidade para empreendimentos imobiliários.
-
-### IMOB — Índice Imobiliário B3
-**O que é:** Índice da B3 que mede a performance das empresas do setor imobiliário listadas em bolsa (incorporadoras, construtoras, administradoras de shoppings).
-**Feeder:** `downloader_b3` → `Feeders/B3/GetIndices.py`
-**Aplicação real:** Monitoramento do desempenho do setor imobiliário no mercado de capitais.
+Para descrição detalhada de cada índice, veja o [Glossário](GLOSSARIO.md).
 
 ---
 
-## Deploy
+## Consultar dados — `GET /api/indices`
 
-```bash
-cd AzureFunctions
-func azure functionapp publish func-dados-publicos-api --python
+```
+/api/indices                                          → último valor de todos
+/api/indices?nome=ipca                                → último IPCA
+/api/indices?nome=cdi&data_inicio=2025-01&data_fim=2025-12  → histórico CDI
 ```
 
-## Setup local
+| Parâmetro | Obrigatório | Descrição |
+|---|---|---|
+| `nome` | Não | Identificador do índice (tabela abaixo) |
+| `data_inicio` | Não | Período inicial `YYYY-MM` |
+| `data_fim` | Não | Período final `YYYY-MM` |
 
-```bash
-cd AzureFunctions
-pip install -r requirements.txt
-func start
+### Todos os índices disponíveis
+
+| Índice | `nome` | Unidade | Fonte |
+|---|---|---|---|
+| INCC-M | `incc-m` | % | FGV/IBRE |
+| IGP-M | `igp-m` | % | FGV/IBRE |
+| IGP-DI | `igp-di` | % | FGV/IBRE |
+| IPCA | `ipca` | % | IBGE |
+| INPC | `inpc` | % | IBGE |
+| SINAPI | `sinapi` | % | IBGE |
+| IPCA-15 | `ipca-15` | % | IBGE |
+| IPCA Acumulado 12M | `ipca-acumulado-12m` | % | BACEN |
+| Selic (acumulada) | `selic` | % a.a. | BACEN |
+| Selic Meta | `selic-meta` | % a.a. | BACEN |
+| CDI | `cdi` | % a.m. | BACEN |
+| Juros Real | `juros-real` | % a.a. | BACEN |
+| TR | `tr` | % a.m. | BACEN |
+| TJLP | `tjlp` | % a.a. | BACEN |
+| Poupança (rendimento) | `poupanca` | % a.m. | BACEN |
+| PTAX USD | `ptax-usd` | R$/USD | BACEN |
+| Taxa Financ. Imob. PF | `taxa-financ-imob-pf` | % a.m. | BACEN |
+| SBPE contratações valor | `sbpe-contratacoes-valor` | R$ mil | BACEN |
+| SBPE contratações unidades | `sbpe-contratacoes-unidades` | unidades | BACEN |
+| SBPE saldo poupança | `sbpe-saldo-poupanca` | R$ bi | BACEN |
+| NTN-B 2035 | `ntn-b-2035` | % a.a. | ANBIMA |
+| ETTJ IPCA 5 anos | `ettj-ipca-5a` | % a.a. | ANBIMA |
+| ETTJ IPCA 10 anos | `ettj-ipca-10a` | % a.a. | ANBIMA |
+| IFIX | `ifix` | pts | B3 |
+| IBOVESPA | `ibovespa` | pts | B3 |
+| IMOB | `imob` | pts | B3 |
+| SMLL | `smll` | pts | B3 |
+| IDIV | `idiv` | pts | B3 |
+| IFNC | `ifnc` | pts | B3 |
+| PIB Trimestral | `pib-trimestral` | % | IBGE |
+| Insumos Construção Civil | `insumos-construcao-civil` | índice (2022=100) | IBGE |
+| Metalurgia | `metalurgia` | índice (2022=100) | IBGE |
+| ANP Diesel | `anp-diesel` | R$/litro | ANP |
+| SOFR | `sofr` | % a.a. | FedNY |
+
+---
+
+## Forçar coleta — `GET /api/downloader_http`
+
 ```
+/api/downloader_http?downloader=bacen&date=2026-03-30
+```
+
+| Parâmetro | Obrigatório | Descrição |
+|---|---|---|
+| `downloader` | Sim | Nome do downloader (tabela abaixo) |
+| `date` | Sim | Data de referência `YYYY-MM-DD` |
+
+### Qual downloader usar para cada índice
+
+| Índice | `nome` | `downloader` | Observação |
+|---|---|---|---|
+| INCC-M | `incc-m` | `fgv` | |
+| IGP-M | `igp-m` | `fgv` | |
+| IGP-DI | `igp-di` | `fgv` | |
+| IPCA | `ipca` | `ibge` | |
+| INPC | `inpc` | `ibge` | |
+| SINAPI | `sinapi` | `ibge` | |
+| IPCA-15 | `ipca-15` | `ibge` | |
+| PIB Trimestral | `pib-trimestral` | `ibge` | RowKey = último mês do trimestre |
+| Insumos Construção Civil | `insumos-construcao-civil` | `ibge` | Proxy cimento (IBGE PIM-PF) |
+| Metalurgia | `metalurgia` | `ibge` | Proxy aço longo (IBGE PIM-PF) |
+| Selic (acumulada) | `selic` | `bacen` | |
+| Selic Meta | `selic-meta` | `bacen` | |
+| CDI | `cdi` | `bacen` | |
+| Juros Real | `juros-real` | `bacen` | Calculado: CDI 12M deflac. IPCA |
+| TR | `tr` | `bacen` | |
+| TJLP | `tjlp` | `bacen` | |
+| Poupança (rendimento) | `poupanca` | `bacen` | |
+| PTAX USD | `ptax-usd` | `bacen` | |
+| Taxa Financ. Imob. PF | `taxa-financ-imob-pf` | `bacen` | |
+| IPCA Acumulado 12M | `ipca-acumulado-12m` | `bacen` | |
+| SBPE contratações valor | `sbpe-contratacoes-valor` | `bacen` | |
+| SBPE contratações unidades | `sbpe-contratacoes-unidades` | `bacen` | |
+| SBPE saldo poupança | `sbpe-saldo-poupanca` | `bacen` | Defasagem ~6-9 meses |
+| NTN-B 2035 | `ntn-b-2035` | `anbima` | Via ETTJ IPCA |
+| ETTJ IPCA 5 anos | `ettj-ipca-5a` | `anbima` | Curva do dia corrente |
+| ETTJ IPCA 10 anos | `ettj-ipca-10a` | `anbima` | Curva do dia corrente |
+| IFIX | `ifix` | `b3` | Apenas último dia do mês |
+| IBOVESPA | `ibovespa` | `b3` | Apenas último dia do mês |
+| IMOB | `imob` | `b3` | Apenas último dia do mês |
+| SMLL | `smll` | `b3` | Apenas último dia do mês |
+| IDIV | `idiv` | `b3` | Apenas último dia do mês |
+| IFNC | `ifnc` | `b3` | Apenas último dia do mês |
+| ANP Diesel | `anp-diesel` | `anp` | |
+| SOFR | `sofr` | `sofr` | |
+
+---
+
+## Infraestrutura Azure
+
+| Recurso | Nome |
+|---|---|
+| Resource Group | `rg-dados-publicos-api` |
+| Function App | `func-dados-publicos-api` (Flex Consumption, Python 3.11) |
+| Storage Account | `stdadospublicosapi` (Standard_LRS) |
+| Table Storage | `IndicesPublicos` |
+
+### Autenticação
+
+100% Managed Identity (System-Assigned) com RBAC. Nenhuma connection string.
+
+| Role | Finalidade |
+|---|---|
+| Storage Blob Data Owner | Runtime Azure Functions |
+| Storage Queue Data Contributor | Runtime Azure Functions |
+| Storage Table Data Contributor | Leitura/escrita na tabela IndicesPublicos |
+
+### Variáveis de ambiente
+
+| Variável | Descrição |
+|---|---|
+| `AzureWebJobsStorage__accountName` | Storage Account (identity-based) |
+| `DADPUBAPI_STORAGE_TABLE_URL` | URL do Table endpoint |
+| `DADPUBAPI_FGV_USER` | Usuário FGV/IBRE |
+| `DADPUBAPI_FGV_PASSWORD` | Senha FGV/IBRE |
+
+---
+
+## Timers automáticos
+
+| Downloader | Schedule (CRON UTC) | Índices |
+|---|---|---|
+| `downloader_fgv` | `0 0 8 * * *` (diário 08h) | INCC-M, IGP-M, IGP-DI |
+| `downloader_ibge` | `0 0 9 * * *` (diário 09h) | IPCA, INPC, SINAPI, IPCA-15, PIB, Insumos, Metalurgia |
+| `downloader_bacen` | `0 0 18 * * *` (diário 18h) | Selic, CDI, PTAX, TR, TJLP, SBPE, Juros Real, etc. |
+| `downloader_anp` | `0 0 10 * * 1` (segunda 10h) | ANP Diesel |
+| `downloader_b3` | `0 0 22 28,29,30,31 * *` (dias 28-31 22h) | IFIX, IBOV, IMOB, SMLL, IDIV, IFNC |
+| `downloader_anbima` | `0 0 18 * * *` (diário 18h) | NTN-B 2035, ETTJ IPCA 5a, ETTJ IPCA 10a |
+| `downloader_sofr` | `0 0 18 * * *` (diário 18h) | SOFR |

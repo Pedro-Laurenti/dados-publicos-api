@@ -12,6 +12,8 @@ DOWNLOADER_MAP = {
     "bacen": "downloader_bacen",
     "anp": "downloader_anp",
     "b3": "downloader_b3",
+    "sofr": "downloader_sofr",
+    "anbima": "downloader_anbima",
 }
 
 

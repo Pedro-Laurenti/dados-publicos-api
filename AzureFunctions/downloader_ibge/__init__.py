@@ -3,7 +3,10 @@ import logging
 from datetime import datetime, timezone
 from Util.logging_config import configure_logging
 from Storage.TableStorageClient import TableStorageClient
-from Constants.Indices import IPCA, INPC, SINAPI, PIB, FONTE_IBGE, UNIDADE_PERCENTUAL
+from Constants.Indices import (
+    IPCA, INPC, SINAPI, IPCA_15, PIB, INSUMOS_CONSTRUCAO, METALURGIA,
+    FONTE_IBGE, UNIDADE_PERCENTUAL, UNIDADE_INDICE,
+)
 from Feeders.Ibge.GetIndicadores import get_indicador
 from Feeders.Ibge.GetPib import get_pib
 
@@ -13,6 +16,9 @@ INDICES_IBGE = {
     IPCA: UNIDADE_PERCENTUAL,
     INPC: UNIDADE_PERCENTUAL,
     SINAPI: UNIDADE_PERCENTUAL,
+    IPCA_15: UNIDADE_PERCENTUAL,
+    INSUMOS_CONSTRUCAO: UNIDADE_INDICE,
+    METALURGIA: UNIDADE_INDICE,
 }
 
 

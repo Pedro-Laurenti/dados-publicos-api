@@ -10,6 +10,9 @@ INDICADORES = {
     "ipca": {"agregado": "1737", "variavel": "2266"},
     "inpc": {"agregado": "1736", "variavel": "44"},
     "sinapi": {"agregado": "2296", "variavel": "1198"},
+    "ipca-15": {"agregado": "3065", "variavel": "355"},
+    "insumos-construcao-civil": {"agregado": "8886", "variavel": "12606"},
+    "metalurgia": {"agregado": "8888", "variavel": "12606", "classificacao": "544[129333]"},
 }
 
 MAX_MONTHS_BACK = 6
@@ -17,10 +20,13 @@ MAX_RETRIES = 3
 
 
 def _build_url(config, periodo):
-    return (
+    url = (
         f"{SIDRA_BASE}/{config['agregado']}/periodos/{periodo}"
         f"/variaveis/{config['variavel']}?localidades=N1[all]"
     )
+    if "classificacao" in config:
+        url += f"&classificacao={config['classificacao']}"
+    return url
 
 
 def _fetch_with_retry(url):

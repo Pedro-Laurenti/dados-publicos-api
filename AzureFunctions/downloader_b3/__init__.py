@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from Util.logging_config import configure_logging
 from Storage.TableStorageClient import TableStorageClient
-from Constants.Indices import IFIX, IBOVESPA, IMOB, FONTE_B3, UNIDADE_PONTOS
+from Constants.Indices import IFIX, IBOVESPA, IMOB, SMLL, IDIV, IFNC, FONTE_B3, UNIDADE_PONTOS
 from Feeders.B3.GetIndices import get_b3_index
 
 configure_logging()
@@ -12,6 +12,9 @@ INDICES_B3 = [
     (IFIX,     "IFIX"),
     (IBOVESPA, "IBOV"),
     (IMOB,     "IMOB"),
+    (SMLL,     "SMLL"),
+    (IDIV,     "IDIV"),
+    (IFNC,     "IFNC"),
 ]
 
 
